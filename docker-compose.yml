@@ -1,0 +1,46 @@
+services:
+  # FlareSolverr Wrapper - receives requests from Laravel
+  flaresolverr-wrapper:
+    build: .
+    ports:
+      - "8191:8191" # Laravel will hit this endpoint
+    environment:
+      - WRAPPER_PORT=8191
+      - FLARESOLVERR_URL=http://flaresolverr:8191
+      - LOCAL_PROXY_PORT_START=4141
+      - MAX_CONCURRENT_PROXIES=20
+      - PROXY_TIMEOUT=120000
+      - NODE_ENV=production
+    networks:
+      - flare-net
+    depends_on:
+      - flaresolverr
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "require('http').get('http://localhost:8191/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) }).on('error', () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Real FlareSolverr - internal service only
+  flaresolverr:
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    environment:
+      - LOG_LEVEL=info
+      - LOG_HTML=false
+      - CAPTCHA_SOLVER=none
+      - TZ=Europe/Kiev
+    networks:
+      - flare-net
+    restart: unless-stopped
+    # No port exposure - only wrapper has access
+
+networks:
+  flare-net:
+    driver: bridge
